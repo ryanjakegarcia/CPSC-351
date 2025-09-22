@@ -1,6 +1,6 @@
 /**
 * PIDManager C++ implementation
-* Author: Ryan Garcia
+* Author: Ryan Garcia & Dhuha Abdulhussein
 * Created: 9/20/2025
 * Last updated: 9/22/2025
 **/
@@ -14,13 +14,14 @@
 #define MAX_PID 1000
 #define TABLE_SIZE MAX_PID - MIN_PID + 1
 
-class PIDManager{
+//pid_manager class by Ryan Garcia & Dhuha Abdulhussein
+class pid_manager{
     private:
         std::vector<bool> pid_map;
         bool initialized;
 
     public:
-        PIDManager(){
+        pid_manager(){
             pid_map.reserve(TABLE_SIZE);
             initialized = false;
         }
@@ -67,7 +68,7 @@ class PIDManager{
 void required_tests(){
     int n = 0;
     int cycle = TABLE_SIZE + n; //Will allocate 'n' too many PIDs.
-    PIDManager manager;
+    pid_manager manager;
     manager.allocate_map(); //Required test 1, calling allocate_map()
 
     for(int i = 0; i < cycle; i++){
@@ -84,6 +85,7 @@ void required_tests(){
     }
 }
 
+//Edge cases class tests by Ryan Garcia
 class edge_cases{
     public:
         edge_cases(){
@@ -94,12 +96,12 @@ class edge_cases{
         }
     private:
         void try_alloc_before_init(){
-            PIDManager manager;
+            pid_manager manager;
             manager.allocate_pid();
         }
 
         void verify_negative_pid(){
-            PIDManager manager;
+            pid_manager manager;
             manager.allocate_map();
             for(int i = MIN_PID; i < MAX_PID + 1; i++){ //Allocates entire table
                 manager.allocate_pid(); 
@@ -110,12 +112,12 @@ class edge_cases{
         }
 
         void release_before_init(){
-            PIDManager manager;
+            pid_manager manager;
             manager.release_pid(100);
         }
 
         void many_operations(){
-            PIDManager manager;
+            pid_manager manager;
             manager.allocate_map();
             int times = 100;
             
@@ -126,35 +128,35 @@ class edge_cases{
                 }
             }
 
-            std::cout << "Manager successfully allocated & deallocated PIDs " << (times * (TABLE_SIZE)) << " times." << std::endl;
+            std::cout << "Manager successfully allocated & deallocated PIDs " << (times * (TABLE_SIZE) * 2) << " times." << std::endl;
         }
 };
 
 // void whatif_tests() by Faris Fraihat
 void whatif_tests(){
-    PIDManager m1;
+    pid_manager m1;
     int pid1 = m1.allocate_pid();
     std::cout << "test1 result: " << pid1 << std::endl;
 
-    PIDManager m2;
+    pid_manager m2;
     m2.release_pid(MIN_PID);
     std::cout << "test2 done" << std::endl;
 
-    PIDManager m3;
+    pid_manager m3;
     m3.allocate_map();
     for(int i = 0; i < 3; i++){
         int p = m3.allocate_pid();
         std::cout << "test3 got pid: " << p << std::endl;
     }
 
-    PIDManager m4; 
+    pid_manager m4; 
     m4.allocate_map();
     int p1 = m4.allocate_pid();
     m4.release_pid(p1);
     int p2 = m4.allocate_pid();
     std::cout << "test4 first=" << p1 << " second=" << p2 << std::endl;
 
-    PIDManager m5;
+    pid_manager m5;
     m5.allocate_map();
     int last=-1;
     for(int i = 0; i < TABLE_SIZE; i++){
@@ -163,7 +165,7 @@ void whatif_tests(){
     int extra = m5.allocate_pid();
     std::cout << "test5 last=" << last << " extra=" << extra << std::endl;
 
-    PIDManager m6;
+    pid_manager m6;
     m6.allocate_map();
     for(int i = 0; i < 10; i++){
         int p = m6.allocate_pid();
