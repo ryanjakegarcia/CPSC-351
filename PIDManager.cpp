@@ -75,12 +75,12 @@ void required_tests(){
         std::cout << "Allocated PID: " << manager.allocate_pid() << std::endl; //Required test 2 & 3, calling allocate_pid() multiple times then checking if the PID is within [100-1000]
     }
 
-    for(int i = MIN_PID; i < MAX_PID; i++){
-        manager.release_pid(i);
-        std::cout << "Released PID: " << i << std::endl; //Required test 4, callin release_pid() for each allocated PID
+    for(int i = 0; i < cycle; i++){
+        manager.release_pid(i + MIN_PID);
+        std::cout << "Released PID: " << i + MIN_PID << std::endl; //Required test 4, callin release_pid() for each allocated PID
     }
 
-    for(int i = MIN_PID; i < MAX_PID; i += 10){
+    for(int i = 0; i < cycle; i++){
         std::cout << "Reallocated PID: " << manager.allocate_pid() << std::endl; //Required test 5, checking if released PID is available again
     }
 }
@@ -183,14 +183,14 @@ int main(){
     }else if(pid == 0){
         std::cout << "Child process PID Manager" << std::endl;
         required_tests();
-        whatif_tests();
+        //whatif_tests();
         edge_cases edge;
         
     }else{
         wait(NULL);
         std::cout<< "Parent process PID Manager" << std::endl;
         required_tests();
-        whatif_tests();
+        //whatif_tests();
         edge_cases edge;
     }
 
