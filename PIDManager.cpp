@@ -9,10 +9,14 @@
 #include<vector>
 #include<unistd.h>
 #include<sys/wait.h>
+#include <cstring>
 
 #define MIN_PID 100
 #define MAX_PID 1000
 #define TABLE_SIZE MAX_PID - MIN_PID + 1
+#define BUFFER_SIZE 25
+#define READ_END 0
+#define WRITE_END 1
 
 //pid_manager class by Ryan Garcia & Dhuha Abdulhussein
 class pid_manager{
@@ -175,24 +179,67 @@ void whatif_tests(){
 }
 
 int main(){
-    pid_t pid = fork();
+    int ppipe[2], cpipe[2]; //Parent writing pipe, child writing pipe
+    pid_t pid;
     
-    if(pid < 0){
-        std::cerr << "Fork failed!" << std::endl;
+    if(pipe(ppipe) == -1){
+        fprintf(stderr, "Parent pipe failed");
         return 1;
-    }else if(pid == 0){
-        std::cout << "Child process PID Manager" << std::endl;
-        required_tests();
-        //whatif_tests();
-        edge_cases edge;
-        
-    }else{
-        wait(NULL);
-        std::cout<< "Parent process PID Manager" << std::endl;
-        required_tests();
-        //whatif_tests();
-        edge_cases edge;
     }
 
+    if(pipe(cpipe) == -1){
+        fprintf(stderr, "Child pipe failed");
+        return 1;
+    }
+
+    pid = fork();
+
+    if(pid < 0){
+        std::cerr << "Fork Failed" << std::endl;
+    } else if(pid == 0){ //child
+        close(ppipe[WRITE_END]);
+        close(cpipe[READ_END]);
+        char buffer[256];
+        int counter = 0;
+        while(true){
+            read(ppipe[READ_END], buffer, sizeof(buffer));
+
+            int received_pid = atoi(buffer);
+            std::cout << "Hello from child, received PID: " << received_pid << std::endl;
+            
+            if(counter < 4){
+                write(cpipe[WRITE_END], "Release", sizeof("Release"));
+            } else if(++counter >= 5){
+                write(cpipe[WRITE_END], "Done", sizeof("Done"));
+                break;
+            } else{
+                write(cpipe[WRITE_END], "Allocate", sizeof("Allocate"));
+            }
+        }
+        close(ppipe[READ_END]);
+        close(cpipe[WRITE_END]);
+    } else{ //parent
+        close(cpipe[WRITE_END]);
+        close(ppipe[READ_END]);
+        pid_manager manager;
+        manager.allocate_map();
+        char buffer[256];
+        while(true){
+            read(cpipe[READ_END], buffer, sizeof(buffer));
+            if(strcmp(buffer, "Release") == 0){
+                manager.release_pid(ppipe[WRITE_END]);
+                std::cout << "Parent received request to release PID: " << ppipe[WRITE_END] << std::endl;
+            } else if(strcmp(buffer, "Done") == 0){
+                break;
+            } else if(strcmp(buffer, "Allocate")){
+                int new_pid = manager.allocate_pid();
+                snprintf(buffer, sizeof(buffer), "%d", new_pid);
+                write(ppipe[WRITE_END], buffer, strlen(buffer) + 1);
+            }
+        }
+        close(cpipe[READ_END]);
+        close(ppipe[WRITE_END]);
+        //wait(NULL);
+    }
     return 0;
 }
