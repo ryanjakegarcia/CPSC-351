@@ -10,11 +10,13 @@
 #include<unistd.h>
 #include<sys/wait.h>
 #include <cstring>
+#include<string>
+#include<fstream>
 
 #define MIN_PID 100
 #define MAX_PID 1000
 #define TABLE_SIZE MAX_PID - MIN_PID + 1
-#define BUFFER_SIZE 25
+#define BUFFER_SIZE 256
 #define READ_END 0
 #define WRITE_END 1
 
@@ -178,6 +180,41 @@ void whatif_tests(){
     std::cout << "test6 done" << std::endl;
 }
 
+//By Faris Fraihat - not working
+/* void parent_handle_requests(int read_fd, int write_fd, pid_manager& manager){
+    char buffer[256];
+    int last_pid = -1;
+    while(true){
+        if(!read(read_fd, buffer, sizeof(buffer))){
+            break;
+        }
+
+        if(strcmp(buffer, "Allocate") == 0){
+            int new_pid = manager.allocate_pid();
+            last_pid = new_pid;
+            snprintf(buffer, sizeof(buffer), "%d", new_pid);
+            write(write_fd, buffer, strlen(buffer) + 1);
+        } else if(strcmp(buffer, "Release") == 0){
+            manager.release_pid(last_pid);
+            std::cout << "Parent received request to release PID: " << last_pid << std::endl;
+        } else if(strcmp(buffer, "Done") == 0){
+            break;
+        }
+    }
+} */
+
+//By Faris Fraihat - not working
+/* void child_request_pids(int write_fd, int read_fd, int iteration){
+    char buffer[256];
+    for(int i = 0; i < iteration; ++i){
+        write(write_fd, "Allocate", sizeof("Allocate"));
+        read(read_fd, buffer, sizeof(buffer));
+        int received_pid = atoi(buffer);
+        std::cout << "Hello from child, received PID: " << received_pid << std::endl;
+        write(write_fd, "Release", sizeof("Release"));
+    }
+} */
+
 int main(){
     int ppipe[2], cpipe[2]; //Parent writing pipe, child writing pipe
     pid_t pid;
@@ -192,30 +229,42 @@ int main(){
         return 1;
     }
 
-    pid = fork();
 
+    pid = fork();
+    std::ofstream parent_file, child_file;
+    parent_file.open("poutput.txt");
+    child_file.open("coutput.txt");
     if(pid < 0){
         std::cerr << "Fork Failed" << std::endl;
     } else if(pid == 0){ //child
         close(ppipe[WRITE_END]);
         close(cpipe[READ_END]);
-        char buffer[256];
+        char buffer[BUFFER_SIZE];
         int counter = 0;
-        while(true){
-            read(ppipe[READ_END], buffer, sizeof(buffer));
+        int cycle = TABLE_SIZE;
+        int last_pid = -1;
 
-            int received_pid = atoi(buffer);
-            std::cout << "Hello from child, received PID: " << received_pid << std::endl;
-            
-            if(counter < 4){
-                write(cpipe[WRITE_END], "Release", sizeof("Release"));
-            } else if(++counter >= 5){
+        while(true){
+            if(counter++ >= cycle && counter <= 2*cycle){
+                snprintf(buffer, sizeof(buffer), "%d", last_pid--); //child writes pid that it wants released
+                write(cpipe[WRITE_END], buffer, sizeof(buffer));
+            } else if(counter > 2*cycle){
                 write(cpipe[WRITE_END], "Done", sizeof("Done"));
                 break;
             } else{
                 write(cpipe[WRITE_END], "Allocate", sizeof("Allocate"));
             }
+
+            read(ppipe[READ_END], buffer, sizeof(buffer));
+
+            if(strcmp(buffer, "Waiting") != 0){
+                int received_pid = atoi(buffer);
+                last_pid = received_pid;
+                std::cout << "Hello from child, received PID: " << received_pid << std::endl;
+                child_file << "Hello from child, received PID: " << received_pid << std::endl;
+            }
         }
+
         close(ppipe[READ_END]);
         close(cpipe[WRITE_END]);
     } else{ //parent
@@ -223,23 +272,31 @@ int main(){
         close(ppipe[READ_END]);
         pid_manager manager;
         manager.allocate_map();
-        char buffer[256];
+
+        //parent_handle_requests(ppipe[READ_END], cpipe[WRITE_END], manager);
+        char buffer[BUFFER_SIZE];
         while(true){
             read(cpipe[READ_END], buffer, sizeof(buffer));
-            if(strcmp(buffer, "Release") == 0){
-                manager.release_pid(ppipe[WRITE_END]);
-                std::cout << "Parent received request to release PID: " << ppipe[WRITE_END] << std::endl;
-            } else if(strcmp(buffer, "Done") == 0){
+
+            if(strcmp(buffer, "Done\0") == 0){
                 break;
-            } else if(strcmp(buffer, "Allocate")){
+            } else if(strcmp(buffer, "Allocate\0") == 0){
                 int new_pid = manager.allocate_pid();
                 snprintf(buffer, sizeof(buffer), "%d", new_pid);
                 write(ppipe[WRITE_END], buffer, strlen(buffer) + 1);
+            } else {
+                int released_pid = atoi(buffer);
+                manager.release_pid(released_pid);
+                std::cout << "Parent received request to release PID: " << released_pid << std::endl;
+                parent_file << "Parent received request to release PID: " << released_pid << std::endl;
+                write(ppipe[WRITE_END], "Waiting", sizeof("Waiting"));
             }
         }
         close(cpipe[READ_END]);
         close(ppipe[WRITE_END]);
-        //wait(NULL);
+        wait(NULL);
     }
+    parent_file.close();
+    child_file.close();
     return 0;
 }
