@@ -178,6 +178,37 @@ void whatif_tests(){
     std::cout << "test6 done" << std::endl;
 }
 
+void parent_handle_requests(int read_fd, int write_fd, pid_manager& manager){
+    char buffer[256];
+    int last_pid = -1;
+    while(true){
+        ssize_t bytes = read(read_fd, buffer, sizeof(buffer));
+        if(bytes <0) break;
+        buffer[bytes] = '\0';
+        if(strcmp(buffer, "Allocate") == 0){
+            int new_pid = manager.allocate_pid();
+            last_pid = new_pid;
+            snprintf(buffer, sizeof(buffer), "%d", new_pid);
+            write(write_fd, buffer, strlen(buffer) + 1);
+        } else if(strcmp(buffer, "Release") == 0){
+            manager.release_pid(last_pid);
+            std::cout << "Parent received request to release PID: " << last_pid << std::endl;
+        } else if(strcmp(buffer, "Done") == 0){
+            break;
+        }
+    }
+}
+
+void child_request_pids(int write_fd, int read_fd, int iteration){
+    char buffer[256];
+    for(int i = 0; i < iteration; ++i){
+        write(write_fd, "Allocate", sizeof("Allocate"));
+        read(read_fd, buffer, sizeof(buffer));
+        std::cout << "Hello from child, received PID: " << received_pid << std::endl;
+        write(write_fd, "Release", sizeof("Release"));
+    }
+}
+
 int main(){
     int ppipe[2], cpipe[2]; //Parent writing pipe, child writing pipe
     pid_t pid;
